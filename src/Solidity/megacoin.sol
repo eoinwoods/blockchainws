@@ -17,34 +17,49 @@ contract Ownable {
   }
 }
 
-contract MegaCoin is Ownable {
+contract TransferLimited {
+    uint64 transferLimit;
+    event TransferLimitExceeded(address to, uint64 value, uint64 transferLimit);
+    
+    function TransferLimited() public {
+        
+    }
+    
+    modifier withTransferLimit(address to, uint64 amount) {
+        if (amount > transferLimit) {
+            TransferLimitExceeded(to, amount, transferLimit);
+            return ;
+        }
+        _ ;
+    }
+    
+    function setTransferLimit(uint64 limit) public {
+        transferLimit = limit ;
+    }
+}
+
+contract MegaCoin is Ownable, TransferLimited {
     
     string public name ;
     string public symbol ;
     uint64 totalSupply ;
     uint64 totalAllocation ;
-    uint64 transferLimit ;
     mapping(address => uint64) balances ;
     address owner ;
     
     event Transfer(address to, uint64 amount, uint64 outstanding) ;
     event InsufficientFunds(address to, uint64 value, uint64 totalOutstanding);
-    event TransferLimitExceeded(address to, uint64 value, uint64 transferLimit);
 
     function MegaCoin(string _name, string _symbol, uint64 _totalSupply) public {
         owner = msg.sender ;  
         name = _name ;
         symbol = _symbol ;
         totalSupply = _totalSupply ;
-        transferLimit = 100 ;
+        setTransferLimit(100) ;
     }
     
-    function allocate(address to, uint64 amount) onlyOwner public {
+    function allocate(address to, uint64 amount) public onlyOwner withTransferLimit(to ,amount) {
         uint64 available = totalSupply - totalAllocation ;
-        if (amount > transferLimit) {
-            TransferLimitExceeded(to, amount, transferLimit) ;
-            return ;            
-        }
         if (amount > available) {
             InsufficientFunds(to, amount, available) ;
             return ;
@@ -53,10 +68,6 @@ contract MegaCoin is Ownable {
         totalAllocation += amount ;
         balances[to] += amount ;
         Transfer(to, amount, available - amount) ;
-    }
-    
-    function setTransferLimit(uint64 limit) onlyOwner public {
-        transferLimit = limit ;
     }
     
     function getHolding(address holder) view public returns(uint64) {
