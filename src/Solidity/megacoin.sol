@@ -27,7 +27,7 @@ contract TransferLimited {
     
     modifier withTransferLimit(address to, uint64 amount) {
         if (amount > transferLimit) {
-            TransferLimitExceeded(to, amount, transferLimit);
+            //TransferLimitExceeded(to, amount, transferLimit);
             return ;
         }
         _ ;
@@ -38,7 +38,27 @@ contract TransferLimited {
     }
 }
 
-contract MegaCoin is Ownable, TransferLimited {
+contract AccessControlled {
+    event AccessDenied(address addr) ;
+    
+    mapping(address=>uint64) whiteList ;
+    function AccessControlled() public {
+        addAddress(msg.sender) ;
+    }
+    function addAddress(address _addr) public {
+        whiteList[_addr] = 1 ;
+    }
+    modifier withAccessControl(address _addr) {
+        if (whiteList[_addr] != 1) {
+           // AccessDenied(_addr) ;
+            return ;
+        } 
+        _ ;
+    }
+    
+}
+
+contract MegaCoin is Ownable, TransferLimited, AccessControlled  {
     
     string public name ;
     string public symbol ;
@@ -70,11 +90,11 @@ contract MegaCoin is Ownable, TransferLimited {
         Transfer(to, amount, available - amount) ;
     }
     
-    function getHolding(address holder) view public returns(uint64) {
+    function getHolding(address holder) view public withAccessControl(msg.sender) returns(uint64) {
         return balances[holder] ;
     }
     
-    function getOutstanding() view public returns(uint64) {
+    function getOutstanding() view public withAccessControl(msg.sender) returns(uint64){
         return totalSupply - totalAllocation;
     }
 }
