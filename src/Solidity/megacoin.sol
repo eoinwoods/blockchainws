@@ -19,7 +19,6 @@ contract Ownable {
 
 contract TransferLimited {
     uint64 transferLimit;
-    event TransferLimitExceeded(address to, uint64 value, uint64 transferLimit);
     
     function TransferLimited() public {
         
@@ -27,7 +26,6 @@ contract TransferLimited {
     
     modifier withTransferLimit(address to, uint64 amount) {
         if (amount > transferLimit) {
-            //TransferLimitExceeded(to, amount, transferLimit);
             return ;
         }
         _ ;
@@ -39,18 +37,16 @@ contract TransferLimited {
 }
 
 contract AccessControlled {
-    event AccessDenied(address addr) ;
     
-    mapping(address=>uint64) whiteList ;
+    mapping(address=>bool) whiteList ;
     function AccessControlled() public {
         addAddress(msg.sender) ;
     }
     function addAddress(address _addr) public {
-        whiteList[_addr] = 1 ;
+        whiteList[_addr] = true ;
     }
     modifier withAccessControl(address _addr) {
-        if (whiteList[_addr] != 1) {
-           // AccessDenied(_addr) ;
+        if (!whiteList[_addr]) {
             return ;
         } 
         _ ;
@@ -69,6 +65,7 @@ contract MegaCoin is Ownable, TransferLimited, AccessControlled  {
     
     event Transfer(address to, uint64 amount, uint64 outstanding) ;
     event InsufficientFunds(address to, uint64 value, uint64 totalOutstanding);
+    event OverflowCondition(address to, uint64 balance, uint64 amount) ;
 
     function MegaCoin(string _name, string _symbol, uint64 _totalSupply) public {
         owner = msg.sender ;  
@@ -78,16 +75,23 @@ contract MegaCoin is Ownable, TransferLimited, AccessControlled  {
         setTransferLimit(100) ;
     }
     
-    function allocate(address to, uint64 amount) public onlyOwner withTransferLimit(to ,amount) {
+    function allocate(address to, uint64 amount) public onlyOwner withTransferLimit(to ,amount) returns(bool) {
         uint64 available = totalSupply - totalAllocation ;
         if (amount > available) {
             InsufficientFunds(to, amount, available) ;
             return ;
         }
         
+        // Checks for overflow of uint64 type
+        if (balances[to] + amount < balances[to]) {
+            OverflowCondition(to, balances[to], amount) ;
+            return ;
+        }
+        
         totalAllocation += amount ;
         balances[to] += amount ;
         Transfer(to, amount, available - amount) ;
+        return true ;
     }
     
     function getHolding(address holder) view public withAccessControl(msg.sender) returns(uint64) {
@@ -98,4 +102,3 @@ contract MegaCoin is Ownable, TransferLimited, AccessControlled  {
         return totalSupply - totalAllocation;
     }
 }
-
